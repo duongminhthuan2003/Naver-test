@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@font-face {
+    font-family: "SF Pro Text", sans-serif;
+    src: url("./assets/fonts/SFProText-Regular.otf") format("opentype");
+    font-weight: 400;
+}
+
+@font-face {
+    font-family: "SF Pro Text Bold", sans-serif;
+    src: url("./assets/fonts/SFProText-Bold.otf") format("opentype");
+    font-weight: 700;
+}
+
+@font-face {
+    font-family: "SF Pro Text Semibold", sans-serif;
+    src: url("./assets/fonts/SFProText-Semibold.otf") format("opentype");
+    font-weight: 600;
+}
+
+@font-face {
+    font-family: "Apple Garamond", serif;
+    src: url("./assets/fonts/AppleGaramond.ttf") format("truetype");
+    font-weight: 400;
+}
+
+@theme {
+    --font-SFProRegular: "SF Pro Text", sans-serif;
+    --font-SFProBold: "SF Pro Text Bold", sans-serif;
+    --font-SFProSemibold: "SF Pro Text Semibold", sans-serif;
+    --font-AppleGaramond: "Apple Garamond", serif;
+
+    --color-tacora: rgb(56, 151, 128);
+    --color-tacora-light: rgb(151, 210, 196);
+    --color-incoming: rgb(74, 162, 57);
+    --color-warning: rgb(255, 161, 63);
+    --color-dangerous: rgb(248, 97, 99);
+    --color-conflicting: rgb(141, 85, 245);
+}
