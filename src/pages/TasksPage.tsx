@@ -1,8 +1,5 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import AddTaskOverlay from "../components/AddTaskOverlay.tsx";
-import { useTaskStore } from "../utils/TaskStore.ts";
-import type { Task } from "../types/TaskType.ts";
-import { findConflicts } from "../utils/Conflict.ts";
 import {HugeiconsIcon} from "@hugeicons/react";
 import {TaskAdd02Icon} from "@hugeicons/core-free-icons";
 import ViewModeToggle from "../components/ViewModeToggle.tsx"
@@ -13,7 +10,6 @@ import TasksByDate from "../components/taskspage/TasksByDate.tsx";
 import ConflictingTasks from "../components/taskspage/ConflictingTasks.tsx";
 
 export default function TasksPage() {
-    const tasks = useTaskStore(s => s.tasks);
 
     const [addOpen, setAddOpen] = useState(false);
 
