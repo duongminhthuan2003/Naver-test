@@ -59,7 +59,7 @@ export default function EditTaskOverlay({ open, onClose, task }: EditTaskModalPr
                 title,
                 dueAt || undefined,
                 type,
-                tasks.filter(t => t.id !== task.id) // Exclude current task from context
+                tasks.filter(t => t.id !== task!.id) // Exclude current task from context
             );
 
             setAiState({
