@@ -1,8 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, {useEffect, useState} from "react";
 import { useTaskStore } from "../utils/TaskStore.ts";
-import { aiService } from "../services/aiService.ts";
-import AISuggestionCard from "./AISuggestionCard.tsx";
-import type { AISuggestionResponse, AISuggestionState } from "../types/AISuggestion.ts";
 
 type Priority = "Low" | "Medium" | "High";
 export type Type = "Work" | "School" | "Group" | "Club" | "Other";
@@ -13,73 +10,17 @@ interface AddTaskModalProps {
 }
 
 export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
-    const { add, tasks } = useTaskStore(s => ({ add: s.add, tasks: s.tasks }));
+    const add = useTaskStore(s => s.add);
 
     const [title, setTitle] = useState("");
     const [dueAt, setDueAt] = useState("");
+    const [hint, setHint] = useState<{priority: 'Low'|'Medium'|'High'; estimatedMins: number; rationale: string} | null>(null);
+    const [loadingHint, setLoadingHint] = useState(false);
+
     const [estimatedMins, setEstimatedMins] = useState<number>(60);
     const [priority, setPriority] = useState<Priority>("Medium");
     const [type, setType] = useState<Type>("School");
     const [error, setError] = useState<string | null>(null);
-    
-    // AI suggestion state
-    const [aiState, setAiState] = useState<AISuggestionState>({
-        isLoading: false,
-        suggestion: null,
-        error: null
-    });
-    const [showAISuggestions, setShowAISuggestions] = useState(false);
-
-    // Auto-trigger AI suggestions when title changes (with debounce)
-    useEffect(() => {
-        if (!title.trim() || title.length < 3) {
-            setAiState(prev => ({ ...prev, suggestion: null }));
-            setShowAISuggestions(false);
-            return;
-        }
-
-        const debounceTimer = setTimeout(() => {
-            getAISuggestions();
-        }, 1000); // 1 second debounce
-
-        return () => clearTimeout(debounceTimer);
-    }, [title, dueAt, type]);
-
-    if (!open) return null;
-
-    async function getAISuggestions() {
-        if (!title.trim()) return;
-
-        setAiState(prev => ({ ...prev, isLoading: true, error: null }));
-
-        try {
-            const suggestion = await aiService.getSuggestionWithContext(
-                title,
-                dueAt || undefined,
-                type,
-                tasks
-            );
-
-            setAiState({
-                isLoading: false,
-                suggestion,
-                error: null
-            });
-            setShowAISuggestions(true);
-        } catch (error) {
-            setAiState({
-                isLoading: false,
-                suggestion: null,
-                error: 'Failed to get AI suggestions'
-            });
-        }
-    }
-
-    function applySuggestion(suggestion: AISuggestionResponse) {
-        setEstimatedMins(suggestion.estimatedMins);
-        setPriority(suggestion.priority);
-        setShowAISuggestions(false);
-    }
 
     function resetForm() {
         setTitle("");
@@ -88,8 +29,6 @@ export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
         setPriority("Medium");
         setType("School");
         setError(null);
-        setAiState({ isLoading: false, suggestion: null, error: null });
-        setShowAISuggestions(false);
     }
 
     function handleClose() {
@@ -115,7 +54,48 @@ export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
         handleClose();
     }
 
+    async function fetchSuggestion(title: string, type: Type, deadlineLocal: string) {
+        if (!title || !type || !deadlineLocal) return;
+        setLoadingHint(true);
+        try {
+            const deadlineISO = new Date(deadlineLocal).toISOString();
+            const res = await fetch('/api/suggest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, type, deadline: deadlineISO }),
+            });
+
+            if (!res.ok) {
+                const text = await res.text();
+                console.error('Suggest API error', res.status, text);
+                setHint(null);
+                return;
+            }
+
+            const data = await res.json();
+            if (!data.error) setHint(data);
+        } finally {
+            setLoadingHint(false);
+        }
+    }
+
+    useEffect(() => {
+        const id = setTimeout(() => {
+            if (title && type && dueAt) fetchSuggestion(title, type, dueAt);
+        }, 400);
+        return () => clearTimeout(id);
+    }, [title, type, dueAt]);
+
+    function applyHint() {
+        if (!hint) return;
+        setPriority(hint.priority);
+        setEstimatedMins(hint.estimatedMins);
+    }
+
+    if (!open) return null;
+
     return (
+
         <div
             className="fixed inset-0 z-50 flex items-center justify-center"
             aria-modal="true"
@@ -123,7 +103,7 @@ export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
         >
             <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
 
-            <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-lg max-h-[90vh] overflow-y-auto">
+            <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-lg">
                 <div className="mb-3 flex items-center justify-between">
                     <h2 className="text-lg font-semibold">Add Task</h2>
                     <button
@@ -148,7 +128,7 @@ export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
                             type="text"
                             value={title}
                             onChange={e => setTitle(e.target.value)}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-tacora"
                             placeholder="Example: Complete OS Lab 2 Task 1"
                             autoFocus
                         />
@@ -160,7 +140,7 @@ export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
                             type="datetime-local"
                             value={dueAt}
                             onChange={e => setDueAt(e.target.value)}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-tacora"
                         />
                     </label>
 
@@ -169,7 +149,7 @@ export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
                         <select
                             value={type}
                             onChange={e => setType(e.target.value as Type)}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-tacora"
                         >
                             <option value="School">School</option>
                             <option value="Club">Club</option>
@@ -179,45 +159,25 @@ export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
                         </select>
                     </label>
 
-                    {/* AI Suggestions Section */}
-                    {(aiState.isLoading || (showAISuggestions && aiState.suggestion)) && (
-                        <div className="space-y-3">
-                            {aiState.isLoading ? (
-                                <AISuggestionCard
-                                    suggestion={{} as AISuggestionResponse}
-                                    onApply={() => {}}
-                                    onDismiss={() => setShowAISuggestions(false)}
-                                    isLoading={true}
-                                />
-                            ) : aiState.suggestion && showAISuggestions ? (
-                                <AISuggestionCard
-                                    suggestion={aiState.suggestion}
-                                    onApply={applySuggestion}
-                                    onDismiss={() => setShowAISuggestions(false)}
-                                />
-                            ) : null}
-                        </div>
-                    )}
-
                     <div className="grid grid-cols-2 gap-3">
                         <label className="text-sm">
-                            <span className="mb-1 block font-medium">Estimated (mins)</span>
+                            <span className="mb-1 font-medium">Estimated (mins)</span>
                             <input
                                 type="number"
                                 min={15}
                                 step={15}
                                 value={estimatedMins}
                                 onChange={e => setEstimatedMins(Number(e.target.value))}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-tacora"
                             />
                         </label>
 
                         <label className="text-sm">
-                            <span className="mb-1 block font-medium">Priority</span>
+                            <span className="mb-1 font-medium">Priority</span>
                             <select
                                 value={priority}
                                 onChange={e => setPriority(e.target.value as Priority)}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-tacora"
                             >
                                 <option value="Low">Low</option>
                                 <option value="Medium">Medium</option>
@@ -226,15 +186,16 @@ export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
                         </label>
                     </div>
 
-                    {!showAISuggestions && !aiState.isLoading && title.trim().length >= 3 && (
-                        <button
-                            type="button"
-                            onClick={getAISuggestions}
-                            className="w-full rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm text-blue-700 hover:bg-blue-100"
-                        >
-                            ✨ Get AI Suggestions
-                        </button>
+                    {hint && (
+                        <div className="rounded-xl border border-tacora p-4 text-sm font-SFProRegular">
+                            <div><b className="text-tacora">Tacora AI suggests:</b> Priority <u>{hint.priority}</u>, {hint.estimatedMins} mins</div>
+                            <div className="text-gray-500 font-SFProRegular">{hint.rationale}</div>
+                            <button type="button" onClick={applyHint} className="flex justify-center mt-1 rounded-lg bg-tacora mt-2 px-3 py-2 text-white">
+                                Apply
+                            </button>
+                        </div>
                     )}
+                    {loadingHint && <div className="text-sm text-gray-500 font-SFProRegular">Suggesting…</div>}
 
                     <div className="mt-4 flex items-center justify-end gap-2">
                         <button
@@ -246,7 +207,7 @@ export default function AddTaskModal({ open, onClose }: AddTaskModalProps) {
                         </button>
                         <button
                             type="submit"
-                            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                            className="rounded-lg bg-tacora px-4 py-2 text-sm font-medium text-white"
                         >
                             Add
                         </button>
